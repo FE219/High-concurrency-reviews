@@ -1,0 +1,23 @@
+target/
+*.jar
+*.war
+*.log
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env specific
+application-prod.yml
+
+# Misc
+*.log.*

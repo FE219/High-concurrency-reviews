@@ -1,0 +1,56 @@
+version: '3.8'
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: YourPassword123
+      MYSQL_DATABASE: hmdp
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: redis
+    command: redis-server --requirepass your_redis_pass
+    ports:
+      - "6379:6379"
+    restart: always
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+    volumes:
+      - etcd_data:/etcd
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: minio server /data
+    volumes:
+      - minio_data:/data
+
+  milvus:
+    image: milvusdb/milvus:v2.3.3
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    ports:
+      - "19530:19530"
+    depends_on:
+      - etcd
+      - minio
+
+volumes:
+  mysql_data:
+  etcd_data:
+  minio_data:
