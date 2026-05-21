@@ -76,7 +76,6 @@
 ## 系统架构
 
 ```
-<img width="2816" height="1536" alt="Gemini_Generated_Image_ai2bu6ai2bu6ai2b" src="https://github.com/user-attachments/assets/01fd697b-63a0-4b14-9f98-e10da51c2914" />
 
 
 ## AI Agent 架构
