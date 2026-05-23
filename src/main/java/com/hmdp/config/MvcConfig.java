@@ -19,19 +19,21 @@ public class MvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        //登录拦截器
+        // LoginInterceptor: only blocks paths that require login
         registry.addInterceptor(new LoginInterceptor())
-                .excludePathPatterns(
-                        "/user/code",
-                        "/user/login",
-                        "/blog/hot",
-                        "/shop/**",
-                        "/voucher/**",
-                        "/upload/**",
-                        "/shop-type/**",
-                        "/ai/**"
-                ).order(1);
-        //token刷新拦截器
-        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).order(0);
+                .addPathPatterns(
+                        "/voucher-order/**",
+                        "/user/sign",
+                        "/blog/like/**",
+                        "/blog/save",
+                        "/follow/**",
+                        "/ai/chat"
+                )
+                .order(1);
+
+        // RefreshTokenInterceptor: runs on ALL paths (optional login)
+        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
+                .addPathPatterns("/**")
+                .order(0);
     }
 }
