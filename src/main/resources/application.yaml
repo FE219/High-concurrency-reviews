@@ -36,3 +36,16 @@ rocketmq:
     send-message-timeout: 3000
   consumer:
     group: hmdp-consumer
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
