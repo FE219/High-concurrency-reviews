@@ -1,8 +1,6 @@
 -- 1.参数列表
 local voucherId = ARGV[1]
 local userId = ARGV[2]
---1.3 订单id
-local orderId = ARGV[3]
 
 -- 可选：参数校验（防止调用方传错）
 if (not voucherId) or (not userId) then
@@ -33,9 +31,7 @@ if (redis.call('sismember', orderKey, userId) == 1) then
     return 2
 end
 
--- 3.3 扣库存 + 下单
+-- 3.3 扣库存 + 标记下单 (NO XADD — RocketMQ handles async persistence)
 redis.call('incrby', stockKey, -1)
 redis.call('sadd', orderKey, userId)
---3.6 发送消息到队列中， XADD stream.orders * k1 v1 k2 v2 ...
-redis.call('xadd', 'stream.orders', '*', 'userId', userId, 'voucherId', voucherId, 'id', orderId)
 return 0
