@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import com.hmdp.annotation.AuditLog;
 import com.hmdp.constant.ErrorCode;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.VoucherOrder;
@@ -61,6 +62,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     @Override
+    @AuditLog
     public Result seckillVoucher(Long voucherId) {
         Long userId = UserHolder.getUser().getId();
         long orderId = redisIdWorker.nextId("order");
