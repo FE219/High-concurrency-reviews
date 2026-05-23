@@ -12,6 +12,7 @@ import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.SensitiveUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -75,6 +76,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             //2.如果不符合，返回错误信息
             return Result.fail("手机号格式错误");
         }
+        log.info("User login, phone={}", SensitiveUtils.maskPhone(phone));
         //3.从redis获取验证码并校验
 //        Object casheCode = session.getAttribute("code");
         String casheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
