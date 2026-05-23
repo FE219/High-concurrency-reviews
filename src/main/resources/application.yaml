@@ -9,3 +9,22 @@ mybatis-plus:
   type-aliases-package: com.hmdp.entity
   configuration:
     map-underscore-to-camel-case: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      aiLlmCall:
+        sliding-window-size: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      aiLlmCall:
+        timeout-duration: 15s
+  retry:
+    instances:
+      aiLlmCall:
+        max-attempts: 3
+        wait-duration: 2s
+        exponential-backoff-multiplier: 2

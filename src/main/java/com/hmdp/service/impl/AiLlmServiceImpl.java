@@ -1,12 +1,16 @@
 package com.hmdp.service.impl;
 
+import com.hmdp.constant.AiFallbackMessages;
 import com.hmdp.dto.AiEvidenceDTO;
 import com.hmdp.dto.response.RecommendationItemDTO;
 import com.hmdp.dto.tool.ShopSimpleDTO;
 import com.hmdp.dto.tool.VoucherSimpleDTO;
+import com.hmdp.exception.AiServiceException;
 import com.hmdp.prompt.AiPromptTemplates;
 import com.hmdp.service.AiLlmService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,6 +18,8 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import cn.hutool.core.util.StrUtil;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -149,14 +155,37 @@ public class AiLlmServiceImpl implements AiLlmService {
 
     @Override
     public String chat(String prompt) {
-        // 这里直接复用你项目中现有的聊天实现
-        // ======= 以下仅示意，请替换成你当前真实调用 =======
         try {
-            return chatLanguageModel.generate(prompt);
+            // 1. 调用异步方法（带熔断+重试）
+            String result = chatWithProtection(prompt).get(15, TimeUnit.SECONDS);
+            return result;
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.error("AI call timed out");
+            throw new AiServiceException("AI call timed out", false);
         } catch (Exception e) {
-            log.error("AiLlmService chat error", e);
-            return null;
+            log.error("AI call failed", e);
+            throw new AiServiceException("AI call failed: " + e.getMessage(), e);
         }
+    }
+
+    @CircuitBreaker(name = "aiLlmCall", fallbackMethod = "chatFallback")
+    @Retry(name = "aiLlmCall")
+    public CompletableFuture<String> chatWithProtection(String prompt) {
+        String result = chatLanguageModel.generate(prompt);
+        return CompletableFuture.completedFuture(result);
+    }
+
+    private CompletableFuture<String> chatFallback(String prompt, AiServiceException e) {
+        log.warn("AI fallback triggered, circuitOpen={}", e.isCircuitOpen());
+        if (e.isCircuitOpen()) {
+            return CompletableFuture.completedFuture(AiFallbackMessages.CIRCUIT_OPEN);
+        }
+        return CompletableFuture.completedFuture(AiFallbackMessages.GENERAL_ERROR);
+    }
+
+    private CompletableFuture<String> chatFallback(String prompt, Exception e) {
+        log.warn("AI fallback triggered by unexpected exception: {}", e.getMessage());
+        return CompletableFuture.completedFuture(AiFallbackMessages.GENERAL_ERROR);
     }
 
     private String buildEvidenceText(List<AiEvidenceDTO> evidenceList) {
@@ -177,16 +206,17 @@ public class AiLlmServiceImpl implements AiLlmService {
             if (evidenceList == null || evidenceList.isEmpty()) {
                 return fallbackAnswer;
             }
-
             String evidenceText = buildEvidenceText(evidenceList);
-
             String prompt = buildEvidencePrompt(userQuestion, evidenceText);
-
+            // Use protected chat call
             String result = chat(prompt);
             if (StrUtil.isBlank(result)) {
                 return fallbackAnswer;
             }
             return result.trim();
+        } catch (AiServiceException e) {
+            log.warn("answerWithEvidence AI failure, using fallback");
+            return fallbackAnswer;
         } catch (Exception e) {
             log.error("answerWithEvidence error, question={}", userQuestion, e);
             return fallbackAnswer;
