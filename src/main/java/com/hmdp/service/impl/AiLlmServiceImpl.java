@@ -42,7 +42,7 @@ public class AiLlmServiceImpl implements AiLlmService {
             return null;
         }
 
-        String prompt = String.format(AiPromptTemplates.SHOP_PROFILE_PROMPT, userMessage, profileContext);
+        String prompt = String.format(AiPromptTemplates.SHOP_PROFILE_PROMPT, sanitize(userMessage), profileContext);
         return chatLanguageModel.generate(prompt);
     }
 
@@ -68,7 +68,7 @@ public class AiLlmServiceImpl implements AiLlmService {
                 ))
                 .collect(Collectors.joining("\n"));
 
-        String prompt = String.format(AiPromptTemplates.RECOMMEND_PROMPT, userMessage, dataText);
+        String prompt = String.format(AiPromptTemplates.RECOMMEND_PROMPT, sanitize(userMessage), dataText);
         return chatLanguageModel.generate(prompt);
     }
 
@@ -128,10 +128,17 @@ public class AiLlmServiceImpl implements AiLlmService {
             return null;
         }
 
-        String prompt = String.format(AiPromptTemplates.RAG_QA_PROMPT, question, contextText);
+        String prompt = String.format(AiPromptTemplates.RAG_QA_PROMPT, sanitize(question), contextText);
         return chatLanguageModel.generate(prompt);
     }
 
+
+    private String sanitize(String input) {
+        if (input == null) return "";
+        return input
+                .replace("\0", "")
+                .replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "");
+    }
 
     private String buildEvidencePrompt(String userQuestion, String evidenceText) {
         return "你是黑马点评的智能导购助手。\n"
@@ -147,7 +154,7 @@ public class AiLlmServiceImpl implements AiLlmService {
                 + "4. 如果问题是规则类问答，回答要明确、清晰\n"
                 + "\n"
                 + "用户问题：\n"
-                + StrUtil.nullToEmpty(userQuestion) + "\n"
+                + sanitize(userQuestion) + "\n"
                 + "\n"
                 + "参考资料：\n"
                 + evidenceText;
@@ -157,7 +164,7 @@ public class AiLlmServiceImpl implements AiLlmService {
     public String chat(String prompt) {
         try {
             // 1. 调用异步方法（带熔断+重试）
-            String result = chatWithProtection(prompt).get(15, TimeUnit.SECONDS);
+            String result = chatWithProtection(sanitize(prompt)).get(15, TimeUnit.SECONDS);
             return result;
         } catch (java.util.concurrent.TimeoutException e) {
             log.error("AI call timed out");
