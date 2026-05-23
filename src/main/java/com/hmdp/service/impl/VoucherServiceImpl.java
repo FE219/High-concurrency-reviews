@@ -55,6 +55,15 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucherService.save(seckillVoucher);
         //保存秒杀库存到Redis中
         stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
+        // Set TTL = activity end time + 7 days to prevent Redis memory leak
+        if (voucher.getEndTime() != null) {
+            java.time.Duration ttl = java.time.Duration.between(
+                java.time.LocalDateTime.now(), voucher.getEndTime()).plusDays(7);
+            if (!ttl.isNegative() && !ttl.isZero()) {
+                stringRedisTemplate.expire(SECKILL_STOCK_KEY + voucher.getId(), ttl);
+                stringRedisTemplate.expire("seckill:order:" + voucher.getId(), ttl);
+            }
+        }
     }
 
     @Override
