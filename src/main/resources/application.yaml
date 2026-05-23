@@ -28,3 +28,11 @@ resilience4j:
         max-attempts: 3
         wait-duration: 2s
         exponential-backoff-multiplier: 2
+
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: hmdp-producer
+    send-message-timeout: 3000
+  consumer:
+    group: hmdp-consumer
