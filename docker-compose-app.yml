@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    container_name: hmdp-app
+    ports:
+      - "8081:8081"
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_HOST=redis
+      - MILVUS_HOST=milvus
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+    depends_on:
+      - mysql
+      - redis
+      - milvus
