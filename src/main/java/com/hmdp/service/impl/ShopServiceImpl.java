@@ -11,6 +11,7 @@ import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.CacheClient;
+import com.hmdp.utils.DelayDoubleDelete;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisData;
 import com.hmdp.utils.SystemConstants;
@@ -50,6 +51,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private DelayDoubleDelete delayDoubleDelete;
     @Override
     public Result queryById(Long id) {
         //缓存穿透
@@ -243,6 +247,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         updateById(shop);
         //2.删除缓存
         stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
+        delayDoubleDelete.deleteWithDelay(CACHE_SHOP_KEY + id, 200);
         // Notify all instances to refresh shop name index
         stringRedisTemplate.convertAndSend("shop:name:refresh", shop.getId().toString());
 
