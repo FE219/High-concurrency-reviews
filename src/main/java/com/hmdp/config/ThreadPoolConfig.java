@@ -8,6 +8,8 @@ import com.hmdp.threadpool.reject.ScheduleRejectPolicy;
 import com.hmdp.threadpool.reject.SeckillRejectPolicy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskDecorator;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.*;
 
@@ -22,15 +24,17 @@ public class ThreadPoolConfig {
      * 3. 独立隔离，防止被其他异步任务抢占
      */
     @Bean(name = BizExecutors.SECKILL_ORDER_EXECUTOR)
-    public ExecutorService seckillOrderExecutor() {
-        return new ThreadPoolExecutor(
-                8,                      // corePoolSize
-                16,                     // maxPoolSize
-                60L, TimeUnit.SECONDS,  // keepAliveTime
-                new ArrayBlockingQueue<>(200), // 小队列
-                new NamedThreadFactory("seckill-order"),
-                new SeckillRejectPolicy()
-        );
+    public ExecutorService seckillOrderExecutor(TaskDecorator taskDecorator) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(8);
+        executor.setMaxPoolSize(16);
+        executor.setKeepAliveSeconds(60);
+        executor.setQueueCapacity(200);
+        executor.setThreadFactory(new NamedThreadFactory("seckill-order"));
+        executor.setRejectedExecutionHandler(new SeckillRejectPolicy());
+        executor.setTaskDecorator(taskDecorator);
+        executor.initialize();
+        return executor.getThreadPoolExecutor();
     }
 
     /**
@@ -41,15 +45,17 @@ public class ThreadPoolConfig {
      * 3. 可退化为调用方执行
      */
     @Bean(name = BizExecutors.CACHE_REBUILD_EXECUTOR)
-    public ExecutorService cacheRebuildExecutor() {
-        return new ThreadPoolExecutor(
-                4,
-                8,
-                60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(500),
-                new NamedThreadFactory("cache-rebuild"),
-                new CacheRejectPolicy()
-        );
+    public ExecutorService cacheRebuildExecutor(TaskDecorator taskDecorator) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setKeepAliveSeconds(60);
+        executor.setQueueCapacity(500);
+        executor.setThreadFactory(new NamedThreadFactory("cache-rebuild"));
+        executor.setRejectedExecutionHandler(new CacheRejectPolicy());
+        executor.setTaskDecorator(taskDecorator);
+        executor.initialize();
+        return executor.getThreadPoolExecutor();
     }
 
     /**
@@ -59,26 +65,33 @@ public class ThreadPoolConfig {
      * 2. 允许降级丢弃
      */
     @Bean(name = BizExecutors.FEED_DISPATCH_EXECUTOR)
-    public ExecutorService feedDispatchExecutor() {
-        return new ThreadPoolExecutor(
-                4,
-                8,
-                60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(1000),
-                new NamedThreadFactory("feed-dispatch"),
-                new FeedRejectPolicy()
-        );
+    public ExecutorService feedDispatchExecutor(TaskDecorator taskDecorator) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setKeepAliveSeconds(60);
+        executor.setQueueCapacity(1000);
+        executor.setThreadFactory(new NamedThreadFactory("feed-dispatch"));
+        executor.setRejectedExecutionHandler(new FeedRejectPolicy());
+        executor.setTaskDecorator(taskDecorator);
+        executor.initialize();
+        return executor.getThreadPoolExecutor();
     }
 
     /**
      * 后台调度线程池：UV统计、排行榜同步、补偿任务
      */
     @Bean(name = BizExecutors.SCHEDULE_EXECUTOR)
-    public ScheduledExecutorService scheduleExecutor() {
+    public ScheduledExecutorService scheduleExecutor(TaskDecorator taskDecorator) {
         return new ScheduledThreadPoolExecutor(
                 4,
                 new NamedThreadFactory("schedule-task"),
                 new ScheduleRejectPolicy()
-        );
+        ) {
+            @Override
+            public void execute(Runnable command) {
+                super.execute(taskDecorator.decorate(command));
+            }
+        };
     }
 }
