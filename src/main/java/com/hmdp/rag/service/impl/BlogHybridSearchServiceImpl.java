@@ -8,12 +8,14 @@ import com.hmdp.rag.dto.VectorSearchResultDTO;
 import com.hmdp.rag.service.BlogHybridSearchService;
 import com.hmdp.rag.service.BlogVectorSearchService;
 import com.hmdp.service.IBlogService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
 
@@ -33,17 +35,17 @@ public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
     @Override
     public List<BlogHybridResultDTO> searchByShop(String question, Long shopId, int topK) {
         if (shopId == null) {
-            System.out.println("[RAG][BLOG] shopId为空，无法检索");
+            log.warn("[RAG][BLOG] shopId为空，无法检索");
             return Collections.emptyList();
         }
 
-        System.out.println("[RAG][BLOG] 当前shopId=" + shopId + ", 问题=" + question);
+        log.info("[RAG][BLOG] 当前shopId={}, 问题={}", shopId, question);
 
         Map<String, BlogHybridResultDTO> mergedMap = new HashMap<>();
 
         // 1. 向量检索优先
         List<VectorSearchResultDTO> vectorResults = blogVectorSearchService.searchByShop(question, shopId, topK);
-        System.out.println("[RAG][BLOG] 向量命中数量=" + (vectorResults == null ? 0 : vectorResults.size()));
+        log.info("[RAG][BLOG] 向量命中数量={}", vectorResults == null ? 0 : vectorResults.size());
 
         if (CollUtil.isNotEmpty(vectorResults)) {
             for (VectorSearchResultDTO item : vectorResults) {
@@ -58,7 +60,7 @@ public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
 
         // 2. 关键词补充
         List<String> keywords = extractBlogKeywords(question);
-        System.out.println("[RAG][BLOG] 提取关键词=" + keywords);
+        log.info("[RAG][BLOG] 提取关键词={}", keywords);
 
         if (CollUtil.isNotEmpty(keywords)) {
             List<Blog> blogList = blogService.query()
@@ -81,7 +83,7 @@ public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
                     .last("limit 5")
                     .list();
 
-            System.out.println("[RAG][BLOG] 关键词命中数量=" + (blogList == null ? 0 : blogList.size()));
+            log.info("[RAG][BLOG] 关键词命中数量={}", blogList == null ? 0 : blogList.size());
 
             if (CollUtil.isNotEmpty(blogList)) {
                 for (int i = 0; i < blogList.size(); i++) {
@@ -110,11 +112,10 @@ public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
                 .limit(topK)
                 .collect(Collectors.toList());
 
-        System.out.println("[RAG][BLOG] 最终TopK数量=" + finalList.size());
+        log.info("[RAG][BLOG] 最终TopK数量={}", finalList.size());
         for (BlogHybridResultDTO item : finalList) {
-            System.out.println("[RAG][BLOG] 命中结果 -> source=" + item.getSource()
-                    + ", score=" + item.getScore()
-                    + ", contentPreview=" + preview(item.getContent()));
+            log.info("[RAG][BLOG] 命中结果 -> source={}, score={}, contentPreview={}",
+                    item.getSource(), item.getScore(), preview(item.getContent()));
         }
 
         return finalList;

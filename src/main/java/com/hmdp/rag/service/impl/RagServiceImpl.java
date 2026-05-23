@@ -12,12 +12,14 @@ import com.hmdp.tool.CouponTool;
 import com.hmdp.tool.RuleTool;
 import com.hmdp.tool.ShopProfileTool;
 import com.hmdp.tool.ShopTool;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class RagServiceImpl implements RagService {
 
@@ -73,10 +75,10 @@ public class RagServiceImpl implements RagService {
                 dto.setNote("未匹配到知识源");
         }
 
-        System.out.println("[RAG] 最终知识源=" + dto.getSourceType());
-        System.out.println("[RAG] 最终上下文长度=" + (dto.getContextText() == null ? 0 : dto.getContextText().length()));
+        log.info("[RAG] 最终知识源={}", dto.getSourceType());
+        log.info("[RAG] 最终上下文长度={}", dto.getContextText() == null ? 0 : dto.getContextText().length());
         if (dto.getContextText() != null) {
-            System.out.println("[RAG] 最终上下文预览=" + preview(dto.getContextText()));
+            log.info("[RAG] 最终上下文预览={}", preview(dto.getContextText()));
         }
         return dto;
     }

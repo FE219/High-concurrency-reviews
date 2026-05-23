@@ -9,12 +9,14 @@ import com.hmdp.rag.dto.VectorSearchResultDTO;
 import com.hmdp.rag.service.FaqHybridSearchService;
 import com.hmdp.rag.service.FaqVectorSearchService;
 import com.hmdp.tool.RuleTool;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class FaqHybridSearchServiceImpl implements FaqHybridSearchService {
 
@@ -30,7 +32,7 @@ public class FaqHybridSearchServiceImpl implements FaqHybridSearchService {
 
         // 1. 关键词检索
         List<RuleDocDTO> keywordDocs = ruleTool.searchRules(question);
-        System.out.println("[RAG][FAQ] 关键词命中数量=" + (keywordDocs == null ? 0 : keywordDocs.size()));
+        log.info("[RAG][FAQ] 关键词命中数量={}", keywordDocs == null ? 0 : keywordDocs.size());
 
         if (CollUtil.isNotEmpty(keywordDocs)) {
             for (int i = 0; i < keywordDocs.size(); i++) {
@@ -49,7 +51,7 @@ public class FaqHybridSearchServiceImpl implements FaqHybridSearchService {
 
         // 2. 向量检索
         List<VectorSearchResultDTO> vectorDocs = faqVectorSearchService.search(question, topK);
-        System.out.println("[RAG][FAQ] 向量命中数量=" + (vectorDocs == null ? 0 : vectorDocs.size()));
+        log.info("[RAG][FAQ] 向量命中数量={}", vectorDocs == null ? 0 : vectorDocs.size());
 
         if (CollUtil.isNotEmpty(vectorDocs)) {
             for (VectorSearchResultDTO vectorDoc : vectorDocs) {
@@ -75,11 +77,10 @@ public class FaqHybridSearchServiceImpl implements FaqHybridSearchService {
                 .limit(topK)
                 .collect(Collectors.toList());
 
-        System.out.println("[RAG][FAQ] 最终TopK数量=" + finalList.size());
+        log.info("[RAG][FAQ] 最终TopK数量={}", finalList.size());
         for (FaqHybridResultDTO item : finalList) {
-            System.out.println("[RAG][FAQ] 命中结果 -> source=" + item.getSource()
-                    + ", score=" + item.getScore()
-                    + ", title=" + item.getTitle());
+            log.info("[RAG][FAQ] 命中结果 -> source={}, score={}, title={}",
+                    item.getSource(), item.getScore(), item.getTitle());
         }
 
         return finalList;

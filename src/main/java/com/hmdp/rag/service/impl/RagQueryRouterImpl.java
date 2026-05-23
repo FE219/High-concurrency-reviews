@@ -3,15 +3,17 @@ package com.hmdp.rag.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.hmdp.rag.enums.RagSourceType;
 import com.hmdp.rag.service.RagQueryRouter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class RagQueryRouterImpl implements RagQueryRouter {
 
     @Override
     public RagSourceType route(String question) {
         if (StrUtil.isBlank(question)) {
-            System.out.println("[RAG] 问题为空，路由=UNKNOWN");
+            log.warn("[RAG] 问题为空，路由=UNKNOWN");
             return RagSourceType.UNKNOWN;
         }
 
@@ -29,8 +31,8 @@ public class RagQueryRouterImpl implements RagQueryRouter {
             result = RagSourceType.UNKNOWN;
         }
 
-        System.out.println("[RAG] 问题=" + question);
-        System.out.println("[RAG] 路由=" + result.name());
+        log.info("[RAG] 问题={}", question);
+        log.info("[RAG] 路由={}", result.name());
 
         return result;
     }

@@ -7,6 +7,7 @@ import com.hmdp.rag.service.EmbeddingService;
 import com.hmdp.rag.service.FaqVectorSearchService;
 import com.hmdp.rag.util.SimilarityUtils;
 import com.hmdp.service.IAiKnowledgeChunkService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -15,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class FaqVectorSearchServiceImpl implements FaqVectorSearchService {
 
@@ -55,7 +57,7 @@ public class FaqVectorSearchServiceImpl implements FaqVectorSearchService {
 
                 resultList.add(dto);
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("FAQ向量检索chunk解析失败 chunkId={}", chunk.getId(), e);
             }
         }
 

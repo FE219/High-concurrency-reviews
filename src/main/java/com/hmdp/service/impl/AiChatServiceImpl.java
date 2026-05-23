@@ -257,20 +257,20 @@ public class AiChatServiceImpl implements AiChatService {
         try {
             RagContextDTO ragContext = ragService.retrieveContext(question, context);
             if (ragContext == null || StrUtil.isBlank(ragContext.getContextText())) {
-                System.out.println("[RAG] 未检索到上下文，使用默认回复");
+                log.info("[RAG] 未检索到上下文，使用默认回复");
                 return defaultReply;
             }
 
             String aiReply = aiLlmService.generateRagAnswer(question, ragContext.getContextText());
             if (StrUtil.isNotBlank(aiReply)) {
-                System.out.println("[RAG] 模型回答=" + aiReply);
+                log.info("[RAG] 模型回答={}", aiReply);
                 return aiReply;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("[RAG] 模型生成失败 question={}", question, e);
         }
 
-        System.out.println("[RAG] 模型生成失败，回退默认回复");
+        log.warn("[RAG] 模型生成失败，回退默认回复");
         return defaultReply;
     }
 
@@ -348,7 +348,7 @@ public class AiChatServiceImpl implements AiChatService {
                 response.setReply(defaultReply);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("RAG知识库问答失败 shopId={}", context.getLastShopId(), e);
             response.setReply(defaultReply);
         }
 
@@ -424,7 +424,7 @@ public class AiChatServiceImpl implements AiChatService {
                 response.setReply(defaultReply);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("店铺详情AI润色失败", e);
             response.setReply(defaultReply);
         }
 
@@ -504,7 +504,7 @@ public class AiChatServiceImpl implements AiChatService {
                 response.setReply(defaultReply);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("优惠券AI润色失败", e);
             response.setReply(defaultReply);
         }
 
@@ -819,14 +819,14 @@ public class AiChatServiceImpl implements AiChatService {
             if (shop != null) {
                 context.setLastShopId(shop.getShopId());
                 context.setLastShopName(shop.getName());
-                System.out.println("[resolveShopId] 使用当前消息店名=" + possibleShopName + ", 解析shopId=" + shop.getShopId());
+                log.info("[resolveShopId] 使用当前消息店名={}, 解析shopId={}", possibleShopName, shop.getShopId());
                 return shop.getShopId();
             }
         }
 
         // 3. 当前消息里没有明确店名，再回退到上下文
         if (context.getLastShopId() != null) {
-            System.out.println("[resolveShopId] 使用历史上下文 shopId=" + context.getLastShopId() + ", shopName=" + context.getLastShopName());
+            log.info("[resolveShopId] 使用历史上下文 shopId={}, shopName={}", context.getLastShopId(), context.getLastShopName());
             return context.getLastShopId();
         }
 
@@ -836,11 +836,11 @@ public class AiChatServiceImpl implements AiChatService {
             if (shop != null) {
                 context.setLastShopId(shop.getShopId());
                 context.setLastShopName(shop.getName());
-                System.out.println("[resolveShopId] 使用历史店名兜底 shopId=" + shop.getShopId());
+                log.info("[resolveShopId] 使用历史店名兜底 shopId={}", shop.getShopId());
                 return shop.getShopId();
             }
         }
-        System.out.println("[resolveShopId] 未解析到店铺");
+        log.info("[resolveShopId] 未解析到店铺");
         return null;
     }
 
@@ -955,7 +955,7 @@ public class AiChatServiceImpl implements AiChatService {
             String json = MAPPER.writeValueAsString(context);
             stringRedisTemplate.opsForValue().set(key, json, 30, TimeUnit.MINUTES);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("保存AI会话上下文失败 sessionId={}", sessionId, e);
         }
     }
 
