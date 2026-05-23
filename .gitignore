@@ -21,3 +21,11 @@ application-prod.yml
 
 # Misc
 *.log.*
+
+# Env
+.env
+.env.local
+.env.production
+
+# Docker
+docker-compose.override.yml
