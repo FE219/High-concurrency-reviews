@@ -33,7 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static com.hmdp.utils.RedisConstants.*;
+import com.hmdp.utils.RedisKey;
 
 /**
  * <p>
@@ -57,13 +57,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Override
     public Result queryById(Long id) {
         //缓存穿透
-        //Shop shop = cacheClient.queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        //Shop shop = cacheClient.queryWithPassThrough(RedisKey.CACHE_SHOP.prefix(), id, Shop.class, this::getById, RedisKey.CACHE_SHOP.ttlMinutes(), TimeUnit.MINUTES);
 
         //互斥锁解决缓存击穿
 //        Shop shop = queryWithMutex(id);
 
         //逻辑过期解决缓存击穿
-        Shop shop = cacheClient.queryWithLogicalExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, 20L, TimeUnit.SECONDS);
+        Shop shop = cacheClient.queryWithLogicalExpire(RedisKey.CACHE_SHOP.prefix(), id, Shop.class, this::getById, 20L, TimeUnit.SECONDS);
 
 
         if (shop == null){
@@ -75,7 +75,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
  /*   private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);*/
 
 //    public Shop queryWithLogicalExpire(Long id){
-//        String key = CACHE_SHOP_KEY + id;
+//        String key = RedisKey.CACHE_SHOP.prefix() + id;
 //        //1.从redis查询商铺缓存
 //        String shopJson = stringRedisTemplate.opsForValue().get(key);
 //        //2.判断是否存在
@@ -96,7 +96,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 //        //5.2 已过期，需要缓存重建
 //        //6.缓存重建
 //        //6.1获取互斥锁
-//        String lockKey = LOCK_SHOP_KEY + id;
+//        String lockKey = RedisKey.LOCK_SHOP.prefix() + id;
 //        boolean isLock = tryLock(lockKey);
 //        //6.2判断是否获取成功
 //        if (isLock){
@@ -122,7 +122,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
 
 //    public Shop queryWithMutex(Long id) {
-//        String key = CACHE_SHOP_KEY + id;
+//        String key = RedisKey.CACHE_SHOP.prefix() + id;
 //
 //        // 1. 查缓存
 //        String shopJson = stringRedisTemplate.opsForValue().get(key);
@@ -167,13 +167,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 //            // 5. 数据库不存在：缓存空值（短 TTL）防穿透
 //            if (shop == null) {
 //                stringRedisTemplate.opsForValue()
-//                        .set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+//                        .set(key, "", RedisKey.CACHE_NULL.ttlMinutes(), TimeUnit.MINUTES);
 //                return null;
 //            }
 //
 //            // 6. 写入 Redis（正常 TTL）
 //            stringRedisTemplate.opsForValue()
-//                    .set(key, JSONUtil.toJsonStr(shop), CACHE_SHOP_TTL, TimeUnit.MINUTES);
+//                    .set(key, JSONUtil.toJsonStr(shop), RedisKey.CACHE_SHOP.ttlMinutes(), TimeUnit.MINUTES);
 //
 //            return shop;
 //        } catch (InterruptedException e) {
@@ -195,11 +195,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         redisData.setData(shop);
         redisData.setExpireTime(LocalDateTime.now().plusSeconds(expireSeconds));
         //3.写入Redis
-        stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(redisData));
+        stringRedisTemplate.opsForValue().set(RedisKey.CACHE_SHOP.prefix() + id, JSONUtil.toJsonStr(redisData));
     }*/
 
 //    public Shop queryWithPassThrough(Long id){
-//        String key = CACHE_SHOP_KEY + id;
+//        String key = RedisKey.CACHE_SHOP.prefix() + id;
 //        //1.从redis查询商铺缓存
 //        String shopJson = stringRedisTemplate.opsForValue().get(key);
 //        //2.判断是否存在
@@ -217,11 +217,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 //        //5.不存在，返回错误
 //        if (shop == null){
 //            //将空值写入Redis
-//            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+//            stringRedisTemplate.opsForValue().set(key, "", RedisKey.CACHE_NULL.ttlMinutes(), TimeUnit.MINUTES);
 //            return null;
 //        }
 //        //6.存在，写入redis
-//        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), CACHE_SHOP_TTL, TimeUnit.MINUTES);
+//        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), RedisKey.CACHE_SHOP.ttlMinutes(), TimeUnit.MINUTES);
 //
 //        return shop;
 //    }
@@ -246,8 +246,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         //1.更新数据库
         updateById(shop);
         //2.删除缓存
-        stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
-        delayDoubleDelete.deleteWithDelay(CACHE_SHOP_KEY + id, 200);
+        stringRedisTemplate.delete(RedisKey.CACHE_SHOP.prefix() + id);
+        delayDoubleDelete.deleteWithDelay(RedisKey.CACHE_SHOP.prefix() + id, 200);
         // Notify all instances to refresh shop name index
         stringRedisTemplate.convertAndSend("shop:name:refresh", shop.getId().toString());
 
@@ -266,7 +266,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         int from = (current - 1) * SystemConstants.DEFAULT_PAGE_SIZE;
         int end = current * SystemConstants.DEFAULT_PAGE_SIZE;
         //查询redis、按照距离排序、分页 结果：shopId、distance
-        String key = SHOP_GEO_KEY + typeId;
+        String key = RedisKey.SHOP_GEO.prefix() + typeId;
         GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo() //GEOSEARCH key BYLONLAT x y BYRADIUS 10 WITHDISTANCE
                 .search(key, GeoReference.fromCoordinate(x, y), new Distance(5000, RedisGeoCommands.DistanceUnit.METERS),
                         RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs().includeDistance().limit(end));
@@ -318,7 +318,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         int from = (current - 1) * SystemConstants.DEFAULT_PAGE_SIZE;
         int end = current * SystemConstants.DEFAULT_PAGE_SIZE;
 
-        String geoKey = SHOP_GEO_KEY + typeId;
+        String geoKey = RedisKey.SHOP_GEO.prefix() + typeId;
         // GEOSEARCH：按坐标+半径查附近店铺，并按距离排序
         GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
                 .search(

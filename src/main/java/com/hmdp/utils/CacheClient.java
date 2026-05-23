@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-import static com.hmdp.utils.RedisConstants.*;
+import com.hmdp.utils.RedisKey;
 
 
 @Slf4j
@@ -58,7 +58,7 @@ public class CacheClient {
         //5.不存在，返回错误
         if (r == null){
             //将空值写入Redis
-            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(key, "", RedisKey.CACHE_NULL.ttlMinutes(), TimeUnit.MINUTES);
             return null;
         }
         //6.存在，写入redis
@@ -84,7 +84,7 @@ public class CacheClient {
         }
 
         // Expired — try to acquire lock
-        String lockKey = LOCK_SHOP_KEY + id;
+        String lockKey = RedisKey.LOCK_SHOP.prefix() + id;
         boolean isLock = tryLock(lockKey);
         if (!isLock) {
             return r;  // another thread is rebuilding, return stale data
