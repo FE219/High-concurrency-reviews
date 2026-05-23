@@ -2,7 +2,9 @@ package com.hmdp.tool;
 
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -22,5 +24,12 @@ public class ShopTypeTool {
             return null;
         }
         return TYPE_MAP.get(keyword);
+    }
+
+    /**
+     * Return all available shop type category names.
+     */
+    public List<String> getAllTypes() {
+        return new ArrayList<>(TYPE_MAP.keySet());
     }
 }
