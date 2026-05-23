@@ -12,11 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
+import cn.hutool.core.util.StrUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -145,7 +141,7 @@ public class AiLlmServiceImpl implements AiLlmService {
                 + "4. 如果问题是规则类问答，回答要明确、清晰\n"
                 + "\n"
                 + "用户问题：\n"
-                + safe(userQuestion) + "\n"
+                + StrUtil.nullToEmpty(userQuestion) + "\n"
                 + "\n"
                 + "参考资料：\n"
                 + evidenceText;
@@ -168,9 +164,9 @@ public class AiLlmServiceImpl implements AiLlmService {
         for (int i = 0; i < evidenceList.size(); i++) {
             AiEvidenceDTO evidence = evidenceList.get(i);
             sb.append("资料").append(i + 1).append("：\n");
-            sb.append("来源类型：").append(safe(evidence.getSourceType())).append("\n");
-            sb.append("标题：").append(safe(evidence.getTitle())).append("\n");
-            sb.append("内容：").append(safe(evidence.getContent())).append("\n\n");
+            sb.append("来源类型：").append(StrUtil.nullToEmpty(evidence.getSourceType())).append("\n");
+            sb.append("标题：").append(StrUtil.nullToEmpty(evidence.getTitle())).append("\n");
+            sb.append("内容：").append(StrUtil.nullToEmpty(evidence.getContent())).append("\n\n");
         }
         return sb.toString();
     }
@@ -187,7 +183,7 @@ public class AiLlmServiceImpl implements AiLlmService {
             String prompt = buildEvidencePrompt(userQuestion, evidenceText);
 
             String result = chat(prompt);
-            if (isBlank(result)) {
+            if (StrUtil.isBlank(result)) {
                 return fallbackAnswer;
             }
             return result.trim();
@@ -195,13 +191,5 @@ public class AiLlmServiceImpl implements AiLlmService {
             log.error("answerWithEvidence error, question={}", userQuestion, e);
             return fallbackAnswer;
         }
-    }
-
-    private String safe(String str) {
-        return str == null ? "" : str;
-    }
-
-    private boolean isBlank(String str) {
-        return str == null || str.trim().isEmpty();
     }
 }
