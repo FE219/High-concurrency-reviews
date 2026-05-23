@@ -243,6 +243,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         updateById(shop);
         //2.删除缓存
         stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
+        // Notify all instances to refresh shop name index
+        stringRedisTemplate.convertAndSend("shop:name:refresh", shop.getId().toString());
 
         return Result.ok();
     }

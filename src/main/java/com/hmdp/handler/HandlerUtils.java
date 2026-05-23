@@ -9,6 +9,7 @@ import com.hmdp.dto.tool.ShopSimpleDTO;
 import com.hmdp.rag.dto.RagContextDTO;
 import com.hmdp.rag.service.RagService;
 import com.hmdp.service.AiLlmService;
+import com.hmdp.shopmatcher.ShopNameMatcher;
 import com.hmdp.tool.ShopTool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class HandlerUtils {
     private final ShopTool shopTool;
     private final RagService ragService;
     private final AiLlmService aiLlmService;
+    private final ShopNameMatcher shopNameMatcher;
 
     /**
      * 解析店铺ID：
@@ -143,39 +145,10 @@ public class HandlerUtils {
     }
 
     /**
-     * 简单识别常见品牌/店名关键词
+     * Extract shop name from user message using data-driven matcher.
      */
     public String extractPossibleShopName(String message) {
-        if (StrUtil.isBlank(message)) {
-            return null;
-        }
-
-        if (message.contains("海底捞")) {
-            return "海底捞";
-        }
-        if (message.contains("103茶餐厅")) {
-            return "103茶餐厅";
-        }
-        if (message.contains("新白鹿")) {
-            return "新白鹿";
-        }
-        if (message.contains("Mamala")) {
-            return "Mamala";
-        }
-        if (message.contains("浅草屋")) {
-            return "浅草屋";
-        }
-        if (message.contains("开乐迪")) {
-            return "开乐迪";
-        }
-        if (message.contains("INLOVE")) {
-            return "INLOVE";
-        }
-        if (message.contains("星聚会")) {
-            return "星聚会";
-        }
-
-        return null;
+        return shopNameMatcher.matchName(message);
     }
 
     public String buildSearchReason(ShopSimpleDTO shop) {
