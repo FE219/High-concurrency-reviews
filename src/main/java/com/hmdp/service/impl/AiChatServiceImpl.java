@@ -117,7 +117,7 @@ public class AiChatServiceImpl implements AiChatService {
         mergeRequestToContext(request, context);
 
         // 5. 识别意图
-        AiIntentType intent = detectIntent(request);
+        AiIntentType intent = detectIntentByLlm(request);
         context.setLastIntent(intent.name());
 
         // 6. 路由处理
@@ -208,6 +208,17 @@ public class AiChatServiceImpl implements AiChatService {
         }
 
         return AiIntentType.UNKNOWN;
+    }
+
+    /**
+     * LLM-based intent routing (future).
+     * Currently falls back to keyword-based detection.
+     * When Spring AI version supports Function Calling natively, replace with:
+     * chatClient.prompt().tools(aiToolDefinitions).call().entity(AiIntentType.class);
+     */
+    private AiIntentType detectIntentByLlm(AiChatRequest request) {
+        // Fallback to keyword match for now
+        return detectIntent(request);
     }
 
     /**
