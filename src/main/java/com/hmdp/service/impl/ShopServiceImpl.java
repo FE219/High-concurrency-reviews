@@ -56,14 +56,12 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     private DelayDoubleDelete delayDoubleDelete;
     @Override
     public Result queryById(Long id) {
-        //缓存穿透
-        //Shop shop = cacheClient.queryWithPassThrough(RedisKey.CACHE_SHOP.prefix(), id, Shop.class, this::getById, RedisKey.CACHE_SHOP.ttlMinutes(), TimeUnit.MINUTES);
-
-        //互斥锁解决缓存击穿
-//        Shop shop = queryWithMutex(id);
-
-        //逻辑过期解决缓存击穿
-        Shop shop = cacheClient.queryWithLogicalExpire(RedisKey.CACHE_SHOP.prefix(), id, Shop.class, this::getById, 20L, TimeUnit.SECONDS);
+        // 二级缓存：L1(Caffeine 30s) → L2(Redis 30min) → DB
+        Shop shop = cacheClient.queryWithTwoLevel(
+                RedisKey.CACHE_SHOP.prefix(), id, Shop.class,
+                this::getById,
+                RedisKey.CACHE_SHOP.ttlMinutes(), TimeUnit.MINUTES,
+                30L);
 
 
         if (shop == null){
@@ -245,10 +243,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
         //1.更新数据库
         updateById(shop);
-        //2.删除缓存
-        stringRedisTemplate.delete(RedisKey.CACHE_SHOP.prefix() + id);
-        delayDoubleDelete.deleteWithDelay(RedisKey.CACHE_SHOP.prefix() + id, 200);
-        // Notify all instances to refresh shop name index
+        //2.删除 L2 Redis 缓存
+        String cacheKey = RedisKey.CACHE_SHOP.prefix() + id;
+        stringRedisTemplate.delete(cacheKey);
+        delayDoubleDelete.deleteWithDelay(cacheKey, 200);
+        //3.通知所有实例清除 L1 本地缓存
+        cacheClient.publishInvalidation(cacheKey);
+        //4.通知所有实例刷新店铺名称索引
         stringRedisTemplate.convertAndSend("shop:name:refresh", shop.getId().toString());
 
         return Result.ok();
