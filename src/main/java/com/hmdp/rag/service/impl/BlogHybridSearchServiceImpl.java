@@ -32,6 +32,11 @@ public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
         return content.length() <= 50 ? content : content.substring(0, 50) + "...";
     }
 
+    /**
+     * RRF 融合常量，业界经验值 60
+     */
+    private static final double RRF_K = 60.0;
+
     @Override
     public List<BlogHybridResultDTO> searchByShop(String question, Long shopId, int topK) {
         if (shopId == null) {
@@ -41,24 +46,28 @@ public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
 
         log.info("[RAG][BLOG] 当前shopId={}, 问题={}", shopId, question);
 
-        Map<String, BlogHybridResultDTO> mergedMap = new HashMap<>();
+        // 存储每个文档的 RRF 分数和来源标记
+        Map<String, Double> rrfScoreMap = new HashMap<>();
+        Map<String, String> sourceMap = new HashMap<>();
+        Map<String, String> contentMap = new HashMap<>();
 
-        // 1. 向量检索优先
-        List<VectorSearchResultDTO> vectorResults = blogVectorSearchService.searchByShop(question, shopId, topK);
+        // ========== 1. 向量检索 ==========
+        List<VectorSearchResultDTO> vectorResults = blogVectorSearchService.searchByShop(question, shopId, 20);
         log.info("[RAG][BLOG] 向量命中数量={}", vectorResults == null ? 0 : vectorResults.size());
 
         if (CollUtil.isNotEmpty(vectorResults)) {
-            for (VectorSearchResultDTO item : vectorResults) {
-                BlogHybridResultDTO dto = new BlogHybridResultDTO();
-                dto.setUniqueKey("BLOG_" + item.getChunkId());
-                dto.setContent(item.getContent());
-                dto.setSource("VECTOR");
-                dto.setScore(100.0 + item.getScore() * 20);
-                mergedMap.put(dto.getUniqueKey(), dto);
+            for (int rank = 0; rank < vectorResults.size(); rank++) {
+                VectorSearchResultDTO item = vectorResults.get(rank);
+                String uniqueKey = "BLOG_" + item.getChunkId();
+
+                double rrfScore = 1.0 / (RRF_K + rank + 1);
+                rrfScoreMap.put(uniqueKey, rrfScore);
+                sourceMap.put(uniqueKey, "VECTOR");
+                contentMap.put(uniqueKey, item.getContent());
             }
         }
 
-        // 2. 关键词补充
+        // ========== 2. 关键词检索 ==========
         List<String> keywords = extractBlogKeywords(question);
         log.info("[RAG][BLOG] 提取关键词={}", keywords);
 
@@ -80,41 +89,49 @@ public class BlogHybridSearchServiceImpl implements BlogHybridSearchService {
                             }
                         }
                     })
-                    .last("limit 5")
+                    .last("limit 20")
                     .list();
 
             log.info("[RAG][BLOG] 关键词命中数量={}", blogList == null ? 0 : blogList.size());
 
             if (CollUtil.isNotEmpty(blogList)) {
-                for (int i = 0; i < blogList.size(); i++) {
-                    Blog blog = blogList.get(i);
-
+                for (int rank = 0; rank < blogList.size(); rank++) {
+                    Blog blog = blogList.get(rank);
                     String uniqueKey = "BLOG_DOC_" + blog.getId();
-                    String content = buildBlogText(blog);
 
-                    BlogHybridResultDTO existing = mergedMap.get(uniqueKey);
-                    if (existing != null) {
-                        existing.setScore(existing.getScore() + 10);
-                    } else {
-                        BlogHybridResultDTO dto = new BlogHybridResultDTO();
-                        dto.setUniqueKey(uniqueKey);
-                        dto.setContent(content);
-                        dto.setSource("KEYWORD");
-                        dto.setScore(80.0 - i * 3);
-                        mergedMap.put(uniqueKey, dto);
+                    double rrfScore = 1.0 / (RRF_K + rank + 1);
+                    // 如果已被向量检索命中，累加 RRF 分数
+                    rrfScoreMap.merge(uniqueKey, rrfScore, Double::sum);
+
+                    // 来源标记：双路命中优先标记 VECTOR+KEYWORD
+                    String existingSource = sourceMap.get(uniqueKey);
+                    sourceMap.put(uniqueKey, existingSource == null ? "KEYWORD" : "VECTOR+KEYWORD");
+
+                    // 内容：向量检索的结果更精准，优先保留
+                    if (!contentMap.containsKey(uniqueKey)) {
+                        contentMap.put(uniqueKey, buildBlogText(blog));
                     }
                 }
             }
         }
 
-        List<BlogHybridResultDTO> finalList = mergedMap.values().stream()
+        // ========== 3. 按 RRF 分数排序 ==========
+        List<BlogHybridResultDTO> finalList = rrfScoreMap.entrySet().stream()
+                .map(entry -> {
+                    BlogHybridResultDTO dto = new BlogHybridResultDTO();
+                    dto.setUniqueKey(entry.getKey());
+                    dto.setScore(entry.getValue());
+                    dto.setSource(sourceMap.getOrDefault(entry.getKey(), "UNKNOWN"));
+                    dto.setContent(contentMap.getOrDefault(entry.getKey(), ""));
+                    return dto;
+                })
                 .sorted(Comparator.comparing(BlogHybridResultDTO::getScore).reversed())
                 .limit(topK)
                 .collect(Collectors.toList());
 
-        log.info("[RAG][BLOG] 最终TopK数量={}", finalList.size());
+        log.info("[RAG][BLOG] RRF融合后TopK数量={}", finalList.size());
         for (BlogHybridResultDTO item : finalList) {
-            log.info("[RAG][BLOG] 命中结果 -> source={}, score={}, contentPreview={}",
+            log.info("[RAG][BLOG] 命中结果 -> source={}, rrfScore={:.6f}, contentPreview={}",
                     item.getSource(), item.getScore(), preview(item.getContent()));
         }
 

@@ -26,60 +26,80 @@ public class FaqHybridSearchServiceImpl implements FaqHybridSearchService {
     @Resource
     private FaqVectorSearchService faqVectorSearchService;
 
+    /**
+     * RRF 融合常量，业界经验值 60
+     */
+    private static final double RRF_K = 60.0;
+
     @Override
     public List<FaqHybridResultDTO> search(String question, int topK) {
-        Map<String, FaqHybridResultDTO> mergedMap = new HashMap<>();
+        // 存储每个文档的 RRF 分数和元数据
+        Map<String, Double> rrfScoreMap = new HashMap<>();
+        Map<String, String> sourceMap = new HashMap<>();
+        Map<String, String> titleMap = new HashMap<>();
+        Map<String, String> contentMap = new HashMap<>();
 
-        // 1. 关键词检索
+        // ========== 1. 关键词检索 ==========
         List<RuleDocDTO> keywordDocs = ruleTool.searchRules(question);
         log.info("[RAG][FAQ] 关键词命中数量={}", keywordDocs == null ? 0 : keywordDocs.size());
 
         if (CollUtil.isNotEmpty(keywordDocs)) {
-            for (int i = 0; i < keywordDocs.size(); i++) {
-                RuleDocDTO doc = keywordDocs.get(i);
+            for (int rank = 0; rank < keywordDocs.size(); rank++) {
+                RuleDocDTO doc = keywordDocs.get(rank);
+                String uniqueKey = "RULE_" + doc.getId();
 
-                FaqHybridResultDTO dto = new FaqHybridResultDTO();
-                dto.setUniqueKey("RULE_" + doc.getId());
-                dto.setTitle(doc.getTitle());
-                dto.setContent(doc.getContent());
-                dto.setSource("KEYWORD");
-                dto.setScore(100.0 - i * 5);
-
-                mergedMap.put(dto.getUniqueKey(), dto);
+                double rrfScore = 1.0 / (RRF_K + rank + 1);
+                rrfScoreMap.put(uniqueKey, rrfScore);
+                sourceMap.put(uniqueKey, "KEYWORD");
+                titleMap.put(uniqueKey, doc.getTitle());
+                contentMap.put(uniqueKey, doc.getContent());
             }
         }
 
-        // 2. 向量检索
-        List<VectorSearchResultDTO> vectorDocs = faqVectorSearchService.search(question, topK);
+        // ========== 2. 向量检索 ==========
+        List<VectorSearchResultDTO> vectorDocs = faqVectorSearchService.search(question, 20);
         log.info("[RAG][FAQ] 向量命中数量={}", vectorDocs == null ? 0 : vectorDocs.size());
 
         if (CollUtil.isNotEmpty(vectorDocs)) {
-            for (VectorSearchResultDTO vectorDoc : vectorDocs) {
+            for (int rank = 0; rank < vectorDocs.size(); rank++) {
+                VectorSearchResultDTO vectorDoc = vectorDocs.get(rank);
                 String uniqueKey = "RULE_" + vectorDoc.getBizId();
 
-                FaqHybridResultDTO existing = mergedMap.get(uniqueKey);
-                if (existing != null) {
-                    existing.setScore(existing.getScore() + vectorDoc.getScore() * 20);
-                } else {
-                    FaqHybridResultDTO dto = new FaqHybridResultDTO();
-                    dto.setUniqueKey(uniqueKey);
-                    dto.setTitle("FAQ规则");
-                    dto.setContent(extractFaqContent(vectorDoc.getContent()));
-                    dto.setSource("VECTOR");
-                    dto.setScore(80.0 + vectorDoc.getScore() * 20);
-                    mergedMap.put(uniqueKey, dto);
+                double rrfScore = 1.0 / (RRF_K + rank + 1);
+                rrfScoreMap.merge(uniqueKey, rrfScore, Double::sum);
+
+                // 来源标记：双路命中优先标记
+                String existingSource = sourceMap.get(uniqueKey);
+                sourceMap.put(uniqueKey, existingSource == null ? "VECTOR" : "KEYWORD+VECTOR");
+
+                // 关键词检索的内容通常更完整，优先保留
+                if (!titleMap.containsKey(uniqueKey)) {
+                    titleMap.put(uniqueKey, "FAQ规则");
+                }
+                if (!contentMap.containsKey(uniqueKey)) {
+                    contentMap.put(uniqueKey, extractFaqContent(vectorDoc.getContent()));
                 }
             }
         }
 
-        List<FaqHybridResultDTO> finalList = mergedMap.values().stream()
+        // ========== 3. 按 RRF 分数排序 ==========
+        List<FaqHybridResultDTO> finalList = rrfScoreMap.entrySet().stream()
+                .map(entry -> {
+                    FaqHybridResultDTO dto = new FaqHybridResultDTO();
+                    dto.setUniqueKey(entry.getKey());
+                    dto.setScore(entry.getValue());
+                    dto.setSource(sourceMap.getOrDefault(entry.getKey(), "UNKNOWN"));
+                    dto.setTitle(titleMap.getOrDefault(entry.getKey(), ""));
+                    dto.setContent(contentMap.getOrDefault(entry.getKey(), ""));
+                    return dto;
+                })
                 .sorted(Comparator.comparing(FaqHybridResultDTO::getScore).reversed())
                 .limit(topK)
                 .collect(Collectors.toList());
 
-        log.info("[RAG][FAQ] 最终TopK数量={}", finalList.size());
+        log.info("[RAG][FAQ] RRF融合后TopK数量={}", finalList.size());
         for (FaqHybridResultDTO item : finalList) {
-            log.info("[RAG][FAQ] 命中结果 -> source={}, score={}, title={}",
+            log.info("[RAG][FAQ] 命中结果 -> source={}, rrfScore={:.6f}, title={}",
                     item.getSource(), item.getScore(), item.getTitle());
         }
 
