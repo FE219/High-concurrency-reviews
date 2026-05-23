@@ -8,6 +8,7 @@ import com.hmdp.service.AiChatService;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.Valid;
 import java.util.UUID;
 
 @RestController
@@ -18,7 +19,7 @@ public class AiChatController {
     private AiChatService aiChatService;
 
     @PostMapping("/chat")
-    public Result chat(@RequestBody AiChatRequest request) {
+    public Result chat(@RequestBody @Valid AiChatRequest request) {
         if (request == null || request.getMessage() == null || request.getMessage().trim().isEmpty()) {
             return Result.fail("message不能为空");
         }
