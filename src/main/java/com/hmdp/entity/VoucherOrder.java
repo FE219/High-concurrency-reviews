@@ -77,5 +77,10 @@ public class VoucherOrder implements Serializable {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 乐观锁版本号
+     */
+    @com.baomidou.mybatisplus.annotation.Version
+    private Integer version;
 
 }

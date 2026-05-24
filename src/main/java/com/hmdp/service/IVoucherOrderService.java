@@ -19,4 +19,10 @@ public interface IVoucherOrderService extends IService<VoucherOrder> {
     void createVoucherOrderFromMq(Long voucherId, Long userId, Long orderId);
 
     boolean orderExists(Long voucherId, Long userId);
+
+    /**
+     * 关闭未支付订单（乐观锁版本号防并发冲突）
+     * @return true=关单成功, false=订单已被支付或已取消
+     */
+    boolean closeOrder(Long orderId, Integer version);
 }

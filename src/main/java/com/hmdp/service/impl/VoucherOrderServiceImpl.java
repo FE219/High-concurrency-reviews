@@ -130,6 +130,21 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 .count() > 0;
     }
 
+    @Override
+    public boolean closeOrder(Long orderId, Integer version) {
+        // WHERE id = ? AND status = 1 AND version = ?
+        // 支付回调若先改了 status 或 version，affected rows = 0，关单自动跳过
+        boolean success = lambdaUpdate()
+                .eq(VoucherOrder::getId, orderId)
+                .eq(VoucherOrder::getStatus, 1)
+                .eq(VoucherOrder::getVersion, version)
+                .set(VoucherOrder::getStatus, 4)
+                .set(VoucherOrder::getVersion, version + 1)
+                .set(VoucherOrder::getUpdateTime, java.time.LocalDateTime.now())
+                .update();
+        return success;
+    }
+
     private void compensateRedisStock(Long voucherId, Long userId) {
         stringRedisTemplate.execute(
                 COMPENSATE_SCRIPT,
