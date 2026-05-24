@@ -25,4 +25,9 @@ public interface IVoucherOrderService extends IService<VoucherOrder> {
      * @return true=关单成功, false=订单已被支付或已取消
      */
     boolean closeOrder(Long orderId, Integer version);
+
+    /**
+     * 关单 + 回滚 MySQL/Redis 库存。延迟队列到期时调用。
+     */
+    void closeOrderWithStockRollback(Long orderId, Integer version, Long voucherId);
 }

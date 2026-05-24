@@ -119,7 +119,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         voucherOrder.setId(orderId);
         voucherOrder.setUserId(userId);
         voucherOrder.setVoucherId(voucherId);
+        voucherOrder.setStatus(1);  // 未支付
+        voucherOrder.setCreateTime(java.time.LocalDateTime.now());
         save(voucherOrder);
+
+        // 4. 挂载延迟关单消息：30 分钟后自动关闭未支付订单
+        transactionProducer.sendOrderCloseDelay(orderId, voucherId);
     }
 
     @Override
@@ -143,6 +148,28 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 .set(VoucherOrder::getUpdateTime, java.time.LocalDateTime.now())
                 .update();
         return success;
+    }
+
+    @Override
+    @Transactional
+    public void closeOrderWithStockRollback(Long orderId, Integer version, Long voucherId) {
+        // 1. 关单（乐观锁，防止与支付回调并发）
+        boolean closed = closeOrder(orderId, version);
+        if (!closed) {
+            log.info("Order already processed, skip rollback: orderId={}", orderId);
+            return;
+        }
+
+        // 2. 回滚 MySQL 库存
+        seckillVoucherService.update()
+                .setSql("stock = stock + 1")
+                .eq("voucher_id", voucherId)
+                .update();
+
+        // 3. 回滚 Redis 库存
+        stringRedisTemplate.opsForValue().increment(
+                com.hmdp.utils.RedisKey.SECKILL_STOCK.key(voucherId));
+        log.info("Stock rolled back: orderId={}, voucherId={}", orderId, voucherId);
     }
 
     private void compensateRedisStock(Long voucherId, Long userId) {
